@@ -1,0 +1,11 @@
+{
+  "API_ENDPOINT": "http://127.0.0.1:8000",
+  "description": "Update API_ENDPOINT when running backend on different machine/port",
+  "examples": {
+    "localhost_default": "http://127.0.0.1:8000",
+    "localhost_custom_port": "http://127.0.0.1:5000",
+    "remote_server": "http://YOUR_SERVER_IP:8000",
+    "google_cloud_example": "http://34.142.123.45:8000",
+    "aws_example": "http://ec2-52-1-2-3.compute-1.amazonaws.com:8000"
+  }
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepScan AI - Analysis</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">DS</div>
+        <div class="brand-text">
+          <div class="brand-title">DeepScan AI</div>
+          <div class="brand-subtitle">Deepfake Analysis</div>
+        </div>
+      </div>
+      <div class="status-chip">
+        <span class="status-dot"></span>
+        <span id="status-text">Waiting for analysis</span>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="loading" id="loading" aria-live="polite">
+        <canvas class="network-canvas" id="network-canvas" aria-hidden="true"></canvas>
+        <div class="loading-inner">
+          <div class="loading-circle">
+            <div class="circle-ring"></div>
+            <div class="circle-ring inner"></div>
+            <div class="circle-ring micro"></div>
+            <div class="circle-spin"></div>
+            <div class="circle-spin accent"></div>
+            <div class="circle-core">DS</div>
+          </div>
+          <h1 class="loading-title">Analyzing video for deepfakes</h1>
+          <p class="loading-subtitle" id="loading-message">Initializing analysis...</p>
+          <div class="loading-steps">
+            <span>Face detection</span>
+            <span>Temporal analysis</span>
+            <span>Artifact scanning</span>
+          </div>
+          <div class="loading-bar">
+            <div class="loading-bar-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="results hidden" id="results">
+        <div class="results-grid split">
+          <div class="left-column">
+            <div class="card video-card">
+              <div class="card-title">Video</div>
+              <div class="video-frame" id="video-frame">
+                <div class="video-placeholder">No preview available</div>
+              </div>
+              <div class="video-meta">
+                <div class="video-meta-row">
+                  <div class="video-title" id="video-title">Unknown video</div>
+                  <a class="video-open" id="video-open" href="#" target="_blank" rel="noopener">Open</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="card factor-card">
+              <div class="card-title">Factor Strength</div>
+              <div class="timeline" id="timeline">
+                <div class="timeline-chart" id="timeline-chart">
+                  <div class="timeline-tooltip" id="timeline-tooltip"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="right-column">
+            <div class="card score-card">
+              <div class="card-title">Deepfake Score</div>
+              <div class="gauge">
+                <div class="gauge-ring">
+                  <div class="gauge-fill" id="gauge-fill"></div>
+                </div>
+                <div class="gauge-center">
+                  <div class="gauge-score" id="gauge-score">--%</div>
+                  <div class="gauge-label" id="gauge-label">Unknown</div>
+                </div>
+              </div>
+
+              <div class="card-title" style="margin-top:12px;">Contributing Factors</div>
+              <div class="factors-section">
+                <ul class="factor-list" id="factor-list"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Frame Heatmap</div>
+          <div class="heatmap" id="heatmap"></div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" id="close-report">Close Report</button>
+        </div>
+      </section>
+
+      <section class="error hidden" id="error">
+        <div class="error-card">
+          <div class="error-title">Analysis Error</div>
+          <div class="error-message" id="error-message">Something went wrong.</div>
+          <button class="secondary" id="retry">Try Again</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="bar-tooltip" class="bar-tooltip" aria-hidden="true"></div>
+
+  <script src="results.js"></script>
+</body>
+</html>
