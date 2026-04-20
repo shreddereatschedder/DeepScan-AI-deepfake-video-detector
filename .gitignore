@@ -5,3 +5,4 @@ __pycache__/
 .git
 backend/venv/
 backend/.venv/
+.git-push-temp
