@@ -22,7 +22,7 @@ logging.getLogger('tensorflow.python').setLevel(logging.ERROR)
 logging.getLogger('tensorflow.python.framework').setLevel(logging.ERROR)
 logging.getLogger('tensorflow.python.util').setLevel(logging.ERROR)
 
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -30,8 +30,6 @@ from pydantic import BaseModel
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.video_analyses.video_analysis_core import analyze_video, cleanup_temp_folder, load_deepfake_model
-import threading
 import glob
 import uuid
 
@@ -128,12 +126,16 @@ def _startup_sanity_check():
         print("[INFO] Running model startup sanity check...")
         # try to load model and run a tiny predict if dataset exists
         if os.path.exists(MODEL_PATH):
-            model = load_deepfake_model(MODEL_PATH)
-            # try a tiny random pixel input to confirm predict works
-            import numpy as np
-            dummy = np.random.rand(1,150,150,3).astype('float32')
-            p = model.predict(dummy, verbose=0)[0][0]
-            print(f"   [SUCCESS] Model predict OK (sanity prob={float(p):.4f})")
+            try:
+                from backend.video_analyses.video_analysis_core import load_deepfake_model
+                model = load_deepfake_model(MODEL_PATH)
+                # try a tiny random pixel input to confirm predict works
+                import numpy as np
+                dummy = np.random.rand(1,150,150,3).astype('float32')
+                p = model.predict(dummy, verbose=0)[0][0]
+                print(f"   [SUCCESS] Model predict OK (sanity prob={float(p):.4f})")
+            except Exception as e:
+                print(f"   [WARNING] Model load/predict failed at startup: {e}")
         else:
             print(f"   [WARNING] Model not found at startup: {MODEL_PATH}")
         
@@ -256,7 +258,19 @@ def download_youtube_video(url: str, cookies_file_override: str | None = None) -
 
         try:
             print(f"[INFO] Downloading video from: {url} (attempt {attempt}/{attempts})")
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            # Attempt to run yt-dlp; if executable missing, fallback to running as a module
+            try:
+                # Primary attempt: run the `yt-dlp` executable directly
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            except FileNotFoundError as e:
+                # Fallback: try running yt-dlp as a Python module (avoids missing exe in PATH)
+                try:
+                    fallback_cmd = [sys.executable, "-m", "yt_dlp"] + list(base_command[1:]) + list(extra_args) + [url]
+                    print("[WARN] yt-dlp executable not found; using python module fallback")
+                    result = subprocess.run(fallback_cmd, check=True, capture_output=True, text=True)
+                except Exception:
+                    # Re-raise to be handled by outer logic
+                    raise
             # Suppress verbose yt-dlp output; not printed to console
 
             # Find the downloaded file
@@ -305,6 +319,13 @@ def analyze_video_background(video_path):
         write_status(video_path, "processing")
         
         # Run analysis
+        try:
+            from backend.video_analyses.video_analysis_core import analyze_video, cleanup_temp_folder
+        except Exception as e:
+            write_status(video_path, "error", {"error": f"missing analysis dependencies: {e}"})
+            print(f"[ERROR] Missing analysis dependencies: {e}")
+            return
+
         result = analyze_video(
             video_path=video_path,
             model_path=MODEL_PATH,
@@ -332,7 +353,11 @@ def analyze_video_background(video_path):
             print(f"   Summary: Fake={result['summary']['fake_percentage']:.1f}%")
         
         # Cleanup temporary folder
-        cleanup_temp_folder(temp_folder)
+        try:
+            cleanup_temp_folder(temp_folder)
+        except NameError:
+            # cleanup function missing (dependencies failed to import earlier)
+            pass
 
         write_status(
             video_path,
@@ -437,8 +462,36 @@ async def upload_cookies(file: UploadFile | None = File(None), cookies_text: str
 
 
 @app.post("/analyze_url")
-async def analyze_url(request: VideoRequest):
-    """Download and analyze a YouTube video."""
+async def analyze_url(request: VideoRequest, http_request: Request):
+    """Download and analyze a YouTube video.
+
+    This endpoint logs incoming payloads and headers to backend/logs/analyze_requests.log
+    to aid debugging of download/analysis failures.
+    """
+    # Server-side logging for incoming requests
+    try:
+        logger = logging.getLogger("analyze_url")
+        if not getattr(logger, "_configured", False):
+            logs_dir = os.path.join(PROJECT_ROOT, "backend", "logs")
+            os.makedirs(logs_dir, exist_ok=True)
+            fh = logging.FileHandler(os.path.join(logs_dir, "analyze_requests.log"), encoding="utf-8")
+            fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            logger.addHandler(fh)
+            logger.setLevel(logging.INFO)
+            logger._configured = True
+        headers = dict(http_request.headers) if http_request is not None else {}
+        client = None
+        try:
+            client = http_request.client.host if getattr(http_request, "client", None) else None
+        except Exception:
+            client = None
+        logger.info("Incoming /analyze_url request: url=%s cookies_text_present=%s client=%s headers=%s",
+                    getattr(request, "url", None),
+                    getattr(request, "cookies_text", None) is not None,
+                    client,
+                    headers)
+    except Exception as e:
+        print(f"[WARN] Failed to write analyze_url log: {e}")
     # If cookies content was provided in the request, write it to a temporary cookies file
     cookies_path = None
     try:

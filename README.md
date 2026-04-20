@@ -77,7 +77,7 @@ python3 setup.py
 
 This single command will:
 - Check/install FFmpeg (system dependency)
-- Verify Python 3.9+ is installed
+- Verify Python 3.9+ is installed +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 - Create a virtual environment (`.venv`)
 - Install all required packages from requirements.txt
 - Verify the installation
@@ -231,7 +231,7 @@ deactivate
 
 ### Batch Analysis (Command Line - No Extension)
 
-For analyzing multiple videos without the Chrome extension:
+For analysing multiple videos without the Chrome extension:
 
 ```python
 python backend/video_analyses/test_run.py --video_path "/path/to/video.mp4" --frames 30
@@ -275,11 +275,16 @@ YouTube blocks automated requests to prevent scraping. The system requires brows
 
 **Solution: Provide Browser Cookies**
 
-Choose one method:
+The setup script now attempts a best-effort automatic cookie export (using `yt-dlp --cookies-from-browser`) during installation. Note:
+
+- If your browser (Chrome/Edge/Firefox) is running, automatic export may fail because the browser locks/encrypts its cookie database. Close the browser completely and re-run `python setup.py` (or re-run the `yt-dlp --cookies-from-browser` command) to allow the automatic export to succeed.
+- If automatic export still fails, use one of the manual options below.
+
+Manual options (fallback):
 
 **Option 1: Environment Variable (Easiest for Local Development)**
 ```bash
-# First, export cookies from your browser
+# First, export cookies from your browser (close browser if necessary)
 yt-dlp --cookies-from-browser chrome --cookies cookies.txt --skip-download https://www.youtube.com
 
 # Then set environment variable and start server
@@ -303,12 +308,12 @@ curl -F "file=@cookies.txt" http://127.0.0.1:8000/upload_cookies
 **Option 3: Include Cookies in Analysis Request**
 ```bash
 curl -X POST -H "Content-Type: application/json" \
-  -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID","cookies_text":"# Netscape format cookies..."}' \
-  http://127.0.0.1:8000/analyze_url
+   -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID","cookies_text":"# Netscape format cookies..."}' \
+   http://127.0.0.1:8000/analyze_url
 ```
 
 **Why This Happens:**
-YouTube uses bot-detection (JavaScript challenges, rate-limiting) to prevent automated access. Browser cookies prove you're a real user and bypass these checks. We don't auto-copy Chrome's cookie database because it fails in headless environments (service contexts, Docker, cloud VMs).
+YouTube uses bot-detection (JavaScript challenges, rate-limiting) to prevent automated access. Browser cookies prove you're a real user and bypass these checks.
 
 ### Extension doesn't appear in Chrome
 
@@ -378,12 +383,7 @@ credibility_checker/
 │           ├── frame_results.csv  # Frame-level metrics
 │           └── summary.csv        # Overall verdict
 │
-├── UI/                              # Next.js dashboard (optional)
-│   ├── app/                       # App pages
-│   ├── components/                # React components
-│   └── package.json               # Node dependencies
-│
-├── dataset/                         # Training data
+├── dataset/                         # Training data (not included here due to size of dataset)
 │   ├── image_dataset/             # Static image data (spatial artifacts)
 │   └── video_dataset/             # Video data (temporal artifacts)
 │
@@ -391,9 +391,8 @@ credibility_checker/
 │   └── #1 through #10 (tracking)
 │
 ├── requirements.txt                 # Python dependencies
-├── README.md                        # This file
-├── NEXT_STEPS.md                    # Development roadmap
-└── GOOGLE_CLOUD_SETUP.md            # Cloud deployment guide
+├── setup.py                         # Script to set up dependencies
+└── README.md                        # This file
 ```
 
 ---
