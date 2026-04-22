@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Automated Setup Script for Deepfake Credibility Checker
 
@@ -515,27 +514,32 @@ def print_completion_message():
 # -------------------------- Main --------------------------
 
 def main():
-    print_header('Deepfake Credibility Checker - Automated Setup')
-    print(f"{Colors.BOLD}This script will:{Colors.RESET}")
-    print('  [1] Install/verify FFmpeg')
-    print('  [2] Verify Python version')
-    print('  [3] Create (and run) virtual environment')
-    print('  [4] Install all Python dependencies via requirements.txt')
-    print('  [5] Verify installation')
-    print_info('This may take a few minutes. Please do not interrupt...')
+    # Skip early steps if re-launching inside venv
+    skip_early_steps = os.environ.get('CRED_SETUP_IN_VENV') == '1'
 
-    # Step 1: FFmpeg (attempt but do not abort on failure)
-    if not install_ffmpeg():
-        print_error('Automated FFmpeg installation failed or FFmpeg not present. Continuing anyway.')
+    if not skip_early_steps:
+        print_header('Automated Setup')
+        print(f"{Colors.BOLD}This script will:{Colors.RESET}")
+        print('  [1] Install/verify FFmpeg')
+        print('  [2] Verify Python version')
+        print('  [3] Create (and run) virtual environment')
+        print('  [4] Install all Python dependencies via requirements.txt')
+        print('  [5] Verify installation')
+        print('  [6] Auto-configure yt-dlp cookies')
+        print_info('This may take a few minutes. Please do not interrupt...')
 
-    # Step 2: Python version
-    if not check_python_version():
-        print_error('Python version check failed. Setup cannot continue.')
-        return False
+        # Step 1: FFmpeg (attempt but do not abort on failure)
+        if not install_ffmpeg():
+            print_error('Automated FFmpeg installation failed or FFmpeg not present. Continuing anyway.')
 
-    # Step 3: Create and (re-)enter virtual environment
-    if not create_virtual_environment():
-        print_error('Virtual environment setup failed; continuing in current environment.')
+        # Step 2: Python version
+        if not check_python_version():
+            print_error('Python version check failed. Setup cannot continue.')
+            return False
+
+        # Step 3: Create and (re-)enter virtual environment
+        if not create_virtual_environment():
+            print_error('Virtual environment setup failed; continuing in current environment.')
 
     # Ensure Python scripts directory is on PATH before installing packages
     try:
@@ -548,17 +552,17 @@ def main():
         print_error('Failed to install Python packages from requirements.txt.')
         return False
 
-    # Step 4.5: Attempt to auto-export cookies for yt-dlp (best-effort)
-    try:
-        auto_setup_cookies()
-    except Exception as e:
-        print_info(f'Auto cookie setup encountered an error: {e}')
-
     # Step 5: Verify
     if not verify_installation():
         print_error('Some packages may not be installed correctly.')
         print_info('Try running: pip install -r requirements.txt')
         return False
+
+    # Step 6: Attempt to auto-export cookies for yt-dlp (best-effort)
+    try:
+        auto_setup_cookies()
+    except Exception as e:
+        print_info(f'Auto cookie setup encountered an error: {e}')
 
     print_completion_message()
     return True
