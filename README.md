@@ -1,6 +1,6 @@
 # DeepFake Credibility Checker
 
-A Chrome browser extension that analyzes videos from YouTube to detect potential deepfakes using advanced forensic analysis. Get real-time credibility assessments with detailed breakdowns of suspicious artifacts.
+A Chrome browser extension that analyses videos from YouTube to flag potential deepfakes using an AI dectection model and advanced forensic analysis. Get real-time credibility assessments with detailed breakdowns of suspicious media.
 
 ---
 
@@ -19,8 +19,8 @@ A Chrome browser extension that analyzes videos from YouTube to detect potential
 
 ## Features
 
-- **Real-time Analysis**: Analyze YouTube videos instantly
-- **Forensic Metrics**: 9 advanced artifact detection methods:
+- **Real-time Analysis**: Analyse YouTube videos instantly
+- **Forensic Metrics**: 7 advanced artifact detection methods:
   - **Warping & Geometric Distortion** (landmark displacement + optical flow)
   - **Lighting Inconsistency** (frame-to-frame shadow direction variance)
   - **Texture Anomalies** (skin texture on face region)
@@ -29,9 +29,8 @@ A Chrome browser extension that analyzes videos from YouTube to detect potential
   - **Chrominance Discontinuities** (Cr/Cb channel edge artifacts)
   - **Compression Artifacts** (JPEG/H.264 blockiness)
 - **Temporal Stability**: 120-frame rolling window (reduced noise, stable baselines)
-- **Face Region Masking**: Analyzes facial area only, eliminates background noise
+- **Face Region Masking**: Analyses facial area only, eliminates background noise
 - **Visual Dashboard**: Color-coded confidence gauge and factor breakdown
-- **Detailed Reports**: Frame statistics and forensic scoring
 - **Local Processing**: All analysis happens on your machine (privacy-first)
 
 ---
@@ -39,9 +38,8 @@ A Chrome browser extension that analyzes videos from YouTube to detect potential
 ## System Requirements
 
 ### Software
-- **Python 3.11** (3.11 is most compatible with Tensorflow)
+- **MUST BE Python 3.11** (3.11 is most compatible with Tensorflow)
 - **Google Chrome** or **Chromium-based browser** (Edge, Brave, etc.)
-- **Git** (optional, for cloning the repository)
 
 ### Hardware
 - **RAM**: 4GB minimum (8GB recommended)
@@ -52,14 +50,6 @@ A Chrome browser extension that analyzes videos from YouTube to detect potential
 - Windows 10+
 - macOS 10.14+
 - Linux (Ubuntu 18.04+)
-
----
-
-## Python Virtual Environment
-
-A Python virtual environment is an automated isolated directory that keeps your project dependencies separate. The setup script handles all of this for you automatically.
-
----
 
 ## Installation
 
@@ -76,13 +66,14 @@ python3 setup.py
 ```
 
 This single command will:
-- Check/install FFmpeg (system dependency)
-- Verify Python 3.9+ is installed +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-- Create a virtual environment (`.venv`)
-- Install all required packages from requirements.txt
-- Verify the installation
+- [1] Install/verify FFmpeg (system dependency)
+- [2] Verify Python version
+- [3] Create (and run) virtual environment
+- [4] Install all Python dependencies via requirements.txt
+- [5] Verify installation
+- [6] Auto-configure yt-dlp cookies
 
-**Expected duration:** 10-20 minutes (mostly TensorFlow download)
+**Expected duration:** 3-5 minutes (mostly TensorFlow download)
 
 ### What Happens After Setup
 
@@ -99,7 +90,7 @@ Your terminal will show success messages like:
 
 ## How to Run the Project
 
-### Step 1: Activate Virtual Environment (if starting fresh terminal)
+### Step 1: Check Virtual Environment has been activated (if starting fresh terminal)
 
 **Windows:**
 ```bash
@@ -133,52 +124,11 @@ Keep this terminal window open. The server is now running.
 2. Enable **"Developer mode"** (toggle in top-right corner)
 3. Click **"Load unpacked"**
 4. Select the `extension/` folder from your project
-5. You should see the extension with a "DS" icon in Chrome toolbar
+5. You should see the extension with a shield icon in Chrome toolbar
 
 ### Step 4: You're All Set!
 
-Everything is configured and ready. Head to the [Usage Guide](#usage-guide) below for detailed step-by-step instructions on analyzing videos.
-
----
-
-## Setup & Configuration
-
-### Custom API Endpoint
-
-If running on a non-standard port or remote server:
-
-**Edit `extension/config.json`:**
-```json
-{
-  "API_ENDPOINT": "http://127.0.0.1:8000"
-}
-```
-
-Examples:
-- **Local (default)**: `http://127.0.0.1:8000`
-- **Custom port**: `http://127.0.0.1:5000`
-- **Remote server**: `http://YOUR_SERVER_IP:8000`
-
-Then reload the extension in Chrome.
-
-### Custom Server Port/Host
-
-```bash
-# With environment variables
-$env:API_PORT = "5000"  # Windows PowerShell
-export API_PORT=5000    # Mac/Linux
-
-uvicorn backend.fastapi_server:app --reload
-```
-
-Then update `extension/config.json` to match.
-
-### Deactivating Virtual Environment
-
-When done working:
-```bash
-deactivate
-```
+Everything is configured and ready. Head to the [Usage Guide](#usage-guide) below for detailed step-by-step instructions on analysing videos.
 
 ---
 
@@ -224,6 +174,47 @@ deactivate
 | **Facial Alignment** | Landmark shifting | Misaligned facial features |
 | **Blinking Patterns** | Unnatural blink frequency | Missing or abnormal blinks |
 | **Compression Artifacts** | Video compression inconsistencies | Suspicious encoding patterns |
+
+---
+
+## Setup & Configuration
+
+### Custom API Endpoint
+
+If running on a non-standard port or remote server:
+
+**Edit `extension/config.json`:**
+```json
+{
+  "API_ENDPOINT": "http://127.0.0.1:8000"
+}
+```
+
+Examples:
+- **Local (default)**: `http://127.0.0.1:8000`
+- **Custom port**: `http://127.0.0.1:5000`
+- **Remote server**: `http://YOUR_SERVER_IP:8000`
+
+Then reload the extension in Chrome.
+
+### Custom Server Port/Host
+
+```bash
+# With environment variables
+$env:API_PORT = "5000"  # Windows PowerShell
+export API_PORT=5000    # Mac/Linux
+
+uvicorn backend.fastapi_server:app --reload
+```
+
+Then update `extension/config.json` to match.
+
+### Deactivating Virtual Environment
+
+When done working:
+```bash
+deactivate
+```
 
 ---
 
@@ -388,7 +379,7 @@ credibility_checker/
 │   └── video_dataset/             # Video data (temporal artifacts)
 │
 ├── My_Dev_Diary/                    # Development journal entries
-│   └── #1 through #10 (tracking)
+│   └── #1 through #... (tracking)
 │
 ├── requirements.txt                 # Python dependencies
 ├── setup.py                         # Script to set up dependencies
@@ -429,31 +420,6 @@ pip install -r requirements.txt
 - **No Data Collection**: Results are not sent to external servers
 - **No User Tracking**: The extension doesn't track your browsing
 - **Open Source**: Code is auditable and transparent
-
----
-
-## 🤝 Contributing
-
-Found a bug or have a suggestion? Please open an issue or submit a pull request!
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see LICENSE file for details.
-
----
-
-## 📧 Support
-
-For issues, questions, or suggestions:
-1. Check [Troubleshooting](#troubleshooting) section above
-2. Review recent analysis logs in `analysis_results/`
-3. Open an issue on GitHub with:
-   - Description of the problem
-   - Steps to reproduce
-   - Browser version and OS
-   - Error messages from console (F12 → Console tab)
 
 ---
 
@@ -508,7 +474,7 @@ For technical details, see:
 
 ---
 
-## Getting Started (Quick Start)
+## Manual Start if setup.py fails
 
 ```bash
 # 1. Activate virtual environment
