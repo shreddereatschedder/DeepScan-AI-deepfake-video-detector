@@ -12,6 +12,7 @@ import shutil
 from pathlib import Path
 import re
 import importlib.util
+import sysconfig
 import tempfile
 import time
 
@@ -282,6 +283,64 @@ def create_virtual_environment():
         print_error(f"Failed to create virtual environment: {e}")
         return False
 
+
+def add_scripts_to_path():
+    """Ensure the Python `scripts` directory is in PATH for this session and persistently where possible.
+
+    - Adds the `scripts` directory (from sysconfig.get_path('scripts')) to `os.environ['PATH']` for this process.
+    - On Windows, attempts to add it to the user's PATH using PowerShell (non-destructive).
+    - On Unix-like systems, appends an `export PATH=...` line to the first available shell rc file.
+    """
+    try:
+        scripts_path = sysconfig.get_path('scripts')
+    except Exception:
+        if os.name == 'nt':
+            scripts_path = os.path.join(os.path.dirname(sys.executable), 'Scripts')
+        else:
+            scripts_path = os.path.join(os.path.dirname(sys.executable), 'bin')
+
+    if not scripts_path:
+        return
+
+    # Normalize
+    scripts_path = os.path.normpath(scripts_path)
+
+    # Add to current session PATH if missing
+    cur_path = os.environ.get('PATH', '')
+    parts = cur_path.split(os.pathsep) if cur_path else []
+    if scripts_path not in parts:
+        os.environ['PATH'] = scripts_path + os.pathsep + cur_path
+        print_info(f"Added {scripts_path} to PATH for this session")
+
+    # Persist on Windows using PowerShell (User PATH)
+    if os.name == 'nt':
+        try:
+            # PowerShell: append user PATH only if it's not already present
+            ps = (
+                f"$p = [Environment]::GetEnvironmentVariable('PATH','User');"
+                f"if ($p -notlike '*{scripts_path}*') {{ [Environment]::SetEnvironmentVariable('PATH', $p + ';{scripts_path}', 'User'); Write-Host 'Updated user PATH'; }} else {{ Write-Host 'User PATH already contains scripts path'; }}"
+            )
+            subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], check=False)
+        except Exception as e:
+            print_info(f"Could not persist PATH on Windows: {e}")
+    else:
+        # Try to add to common shell rc files for Unix-like systems
+        try:
+            rc_files = [Path.home() / '.profile', Path.home() / '.bashrc', Path.home() / '.zshrc']
+            export_line = f"\n# added by credibility_checker setup\nexport PATH=\"{scripts_path}:$PATH\"\n"
+            for rc in rc_files:
+                try:
+                    content = rc.read_text(encoding='utf-8') if rc.exists() else ''
+                    if scripts_path not in content:
+                        with open(rc, 'a', encoding='utf-8') as fh:
+                            fh.write(export_line)
+                            print_info(f"Appended PATH export to {rc}")
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
 def install_python_packages():
     """Install Python packages from requirements.txt"""
     print_step(4, "Installing Python dependencies...")
@@ -350,33 +409,78 @@ def install_python_packages():
         except Exception:
             return False
 
-    # Iterate and install missing packages individually
-    for spec in reqs:
-        # Extract base package name before any version or extras
-        base = re.split(r"[<>=~!]+", spec)[0].split('[')[0].strip()
-        base_lower = base.lower()
-        import_name = import_map.get(base_lower, base_lower)
+    # Ensure Python scripts directory is on PATH for this session (and persistently where possible)
+    try:
+        add_scripts_to_path()
+    except Exception:
+        pass
 
+    # Helper: base name for requirement spec
+    def base_name_of(spec: str) -> str:
+        return re.split(r"[<>=~!]+", spec)[0].split('[')[0].strip().lower()
+
+    # If TensorFlow is requested (or already installed) we should pin numpy to <2 to avoid NumPy 2.x breaking TF
+    wants_tf = any(base_name_of(s) in ('tensorflow', 'tensorflow-intel', 'tensorflow-cpu') for s in reqs) or is_importable('tensorflow') or is_importable('tensorflow_intel')
+    if wants_tf:
+        numpy_spec = 'numpy<2.0.0,>=1.23.5'
+        # remove any explicit numpy specs and ensure our pinned numpy is installed first
+        reqs = [s for s in reqs if base_name_of(s) != 'numpy']
+        reqs.insert(0, numpy_spec)
+
+    # Prioritise installing critical packages first to avoid bad upgrades (numpy, tensorflow, ml-dtypes, protobuf)
+    priority_bases = ('numpy', 'tensorflow', 'tensorflow-intel', 'ml-dtypes', 'protobuf')
+    priority = [s for s in reqs if base_name_of(s) in priority_bases]
+    others = [s for s in reqs if base_name_of(s) not in priority_bases]
+
+    def pip_install(spec: str) -> bool:
+        try:
+            print_info(f"Installing {spec}...")
+            subprocess.run([sys.executable, "-m", "pip", "install", spec], check=True)
+            print_success(f"Installed {spec}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print_error(f"Failed to install {spec}: {e}")
+            return False
+
+    # Install priority list first (enforce numpy reinstall if present)
+    for spec in priority:
+        base = base_name_of(spec)
+        import_name = import_map.get(base, base)
+        if base == 'numpy':
+            # Always (re)install pinned numpy to satisfy TensorFlow
+            pip_install(spec)
+            continue
         if is_importable(import_name):
             print_info(f"{import_name} already installed; skipping {spec}")
             continue
-
-        # Special handling: if installing opencv-contrib-python but opencv-python is present, uninstall it first
-        if base_lower == 'opencv-contrib-python':
+        # Special handling for OpenCV conflict
+        if base == 'opencv-contrib-python':
             try:
                 if subprocess.run([sys.executable, '-m', 'pip', 'show', 'opencv-python'], capture_output=True).returncode == 0:
                     print_info('Detected opencv-python; uninstalling to avoid conflict')
                     subprocess.run([sys.executable, '-m', 'pip', 'uninstall', '-y', 'opencv-python'], check=False)
             except Exception:
                 pass
+        pip_install(spec)
 
-        try:
-            print_info(f"Installing {spec}...")
-            subprocess.run([sys.executable, "-m", "pip", "install", spec], check=True)
-            print_success(f"Installed {spec}")
-        except subprocess.CalledProcessError as e:
-            print_error(f"Failed to install {spec}: {e}")
-            print_info("Continuing with remaining packages...")
+    # Install remaining packages
+    for spec in others:
+        base = base_name_of(spec)
+        import_name = import_map.get(base, base)
+        if is_importable(import_name):
+            print_info(f"{import_name} already installed; skipping {spec}")
+            continue
+        if base == 'opencv-contrib-python':
+            try:
+                if subprocess.run([sys.executable, '-m', 'pip', 'show', 'opencv-python'], capture_output=True).returncode == 0:
+                    print_info('Detected opencv-python; uninstalling to avoid conflict')
+                    subprocess.run([sys.executable, '-m', 'pip', 'uninstall', '-y', 'opencv-python'], check=False)
+            except Exception:
+                pass
+        pip_install(spec)
+
+    print_success("Finished attempting to install required Python packages")
+    return True
 
     print_success("Finished attempting to install required Python packages")
     return True
@@ -589,7 +693,12 @@ def main():
     # Step 3: Virtual environment (auto)
     if not create_virtual_environment():
         print_error("Virtual environment setup failed; continuing in current environment.")
-    
+    # Ensure Python scripts directory is on PATH before installing packages
+    try:
+        add_scripts_to_path()
+    except Exception:
+        pass
+
     # Step 4: Install packages
     if not install_python_packages():
         print_error("Failed to install Python packages.")
