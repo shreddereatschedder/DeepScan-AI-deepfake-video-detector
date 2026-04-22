@@ -316,7 +316,10 @@ def create_virtual_environment():
 
 
 def add_scripts_to_path():
-    """Ensure the Python `scripts` directory is in PATH for this session and persistently where possible."""
+    """Ensure the Python `scripts` directory is on `PATH` for this process only.
+
+    Deliberately avoid persisting changes to user PATH or shell rc files.
+    """
     try:
         scripts_path = sysconfig.get_path('scripts')
     except Exception:
@@ -335,32 +338,6 @@ def add_scripts_to_path():
         os.environ['PATH'] = scripts_path + os.pathsep + cur_path
         print_info(f'Added {scripts_path} to PATH for this session')
 
-    if os.name == 'nt':
-        try:
-            ps = (
-                f"$p = [Environment]::GetEnvironmentVariable('PATH','User');"
-                f"if ($p -notlike '*{scripts_path}*') {{ [Environment]::SetEnvironmentVariable('PATH', $p + ';{scripts_path}', 'User'); Write-Host 'Updated user PATH'; }} else {{ Write-Host 'User PATH already contains scripts path'; }}"
-            )
-            subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps], check=False)
-        except Exception as e:
-            print_info(f'Could not persist PATH on Windows: {e}')
-    else:
-        try:
-            rc_files = [Path.home() / '.profile', Path.home() / '.bashrc', Path.home() / '.zshrc']
-            export_line = f"\n# added by credibility_checker setup\nexport PATH=\"{scripts_path}:$PATH\"\n"
-            for rc in rc_files:
-                try:
-                    content = rc.read_text(encoding='utf-8') if rc.exists() else ''
-                    if scripts_path not in content:
-                        with open(rc, 'a', encoding='utf-8') as fh:
-                            fh.write(export_line)
-                            print_info(f'Appended PATH export to {rc}')
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
 
 def install_python_packages():
     """Install Python packages from `requirements.txt` inside the project's virtualenv.
@@ -377,12 +354,7 @@ def install_python_packages():
 
     print_info('Installing packages from requirements.txt inside the virtual environment...')
 
-    try:
-        subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'], check=True)
-        print_success('Pip upgraded')
-    except subprocess.CalledProcessError:
-        print_info('Could not upgrade pip; continuing with installation')
-
+    # Keep behavior minimal: do not upgrade pip or install anything else first.
     try:
         subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', str(requirements_file)], check=True)
         print_success('Installed packages from requirements.txt')
@@ -525,23 +497,14 @@ def print_completion_message():
     print_header('Setup Complete!')
     print(f"{Colors.GREEN}Everything is installed and ready to go!{Colors.RESET}\n")
     print(f"{Colors.BOLD}Next steps:{Colors.RESET}")
-    print('  1. Activate virtual environment (if created):')
-    os_name = get_os_name()
-    if os_name == 'windows':
-        print('     .venv\\Scripts\\activate')
-    else:
-        print('     source .venv/bin/activate')
-    print('\n  2. YT-DLP cookies:')
-    print('     The setup attempts a best-effort automatic cookie export for yt-dlp.')
-    print('     If downloads fail, see README.md for manual cookie setup options.')
-    print('\n  3. Start the backend server:')
+    print('\n  1. Start the backend server:')
     print('     uvicorn backend.fastapi_server:app --reload')
-    print('\n  4. Load the extension in Chrome:')
+    print('\n  2. Load the extension in Chrome:')
     print('     - Open chrome://extensions')
     print('     - Enable Developer Mode')
     print("     - Click 'Load unpacked'")
     print("     - Select the 'extension' folder")
-    print('\n  5. Read README.md for detailed usage instructions')
+    print('\n  3. Read README.md for detailed usage instructions')
     print('\nTroubleshooting:')
     print('  - If you see any import errors, try: pip install -r requirements.txt')
     print('  - For TensorFlow errors on GPU: Check CUDA/cuDNN installation')
