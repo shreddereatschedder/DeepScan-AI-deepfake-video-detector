@@ -16,7 +16,7 @@ const gaugeLabel = document.getElementById("gauge-label");
 const factorList = document.getElementById("factor-list");
 const timelineChart = document.getElementById("timeline-chart");
 const timelineTooltip = document.getElementById("timeline-tooltip");
-const heatmap = document.getElementById("heatmap");
+const frameSummary = document.getElementById("frame-summary");
 const networkCanvas = document.getElementById("network-canvas");
 
 const closeReportButton = document.getElementById("close-report");
@@ -159,6 +159,27 @@ function setGauge(score) {
   }
 }
 
+function renderFrameSummary(data) {
+  //if (!frameSummary) return;
+  //frameSummary.innerHTML = "";
+  //if (!data || !data.summary) { frameSummary.innerHTML = "<p>No frame summary data available</p>"; return; }
+  const summary = data.summary || {};
+  const fakeFrames = summary.fake_frames || 0;
+  const totalFrames = summary.total_frames_analyzed || 1;
+  const stats = [
+    { label: "Real frames", value: (summary.total_frames_analyzed || 0) - fakeFrames, color: "#00e87b" },
+    { label: "Fake frames", value: fakeFrames, color: "#ff2d78" },
+    { label: "Frame coverage", value: `${(totalFrames / 30).toFixed(1)}s approx`, color: "#00a8e8" },
+  ];
+  stats.forEach((stat) => {
+    const cell = document.createElement("div");
+    cell.className = "frame-summary-cell";
+    cell.style.borderLeft = `4px solid ${stat.color}`;
+    cell.innerHTML = `<span style="color: ${stat.color}; font-weight: 600;">${stat.label}</span>: ${stat.value}`;
+    frameSummary && frameSummary.appendChild(cell);
+  });
+}
+
 function renderFactors(data) {
   if (!factorList) return;
   factorList.innerHTML = "";
@@ -286,6 +307,7 @@ function renderFactors(data) {
       if (maxH < 80) maxH = 80;
       factorsSection.style.maxHeight = `${maxH}px`;
       factorsSection.style.overflowY = 'auto';
+      try { adjustRightScoreCardHeight(); } catch (e) { /* ignore */ }
     } catch (err) { /* ignore */ }
   }
 
@@ -296,6 +318,7 @@ function renderFactors(data) {
       if (__rc_resize_timer) clearTimeout(__rc_resize_timer);
       __rc_resize_timer = setTimeout(() => {
         updateFactorsMaxHeight();
+        try { adjustRightScoreCardHeight(); } catch (e) { /* ignore */ }
         __rc_resize_timer = null;
       }, 140);
     }, { passive: true });
@@ -484,6 +507,60 @@ function ensureBarTooltip(){
   return t;
 }
 
+// Adjust the right-column score-card so its top matches the first left-column
+// score card top and its bottom matches the second left-column score card bottom.
+// This accounts for any gap between the two left cards and keeps the layout
+// visually aligned. Called on resize and after rendering results.
+function adjustRightScoreCardHeight() {
+  try {
+    const rightCard = document.querySelector('.score-card');
+    if (!rightCard) return;
+
+    // Collect visible .card elements excluding the rightCard itself
+    const allCards = Array.from(document.querySelectorAll('.card')).filter((el) => el && el.offsetParent !== null && el !== rightCard);
+    if (!allCards.length) return;
+
+    const rightRect = rightCard.getBoundingClientRect();
+    const thresholdX = rightRect.left;
+
+    // Try to detect left-column cards by spatial relationship (cards whose right edge is left of the right column)
+    let leftCandidates = allCards.filter((c) => {
+      const r = c.getBoundingClientRect();
+      return (r.right <= thresholdX - 8);
+    });
+
+    // Fallback: if detection failed, use the first two visible cards in document order
+    if (leftCandidates.length < 2) {
+      leftCandidates = allCards.slice(0, 2);
+    }
+    if (leftCandidates.length < 2) return;
+
+    // Sort by vertical position
+    leftCandidates.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    const firstRect = leftCandidates[0].getBoundingClientRect();
+    const secondRect = leftCandidates[1].getBoundingClientRect();
+
+    const desiredTop = firstRect.top;
+    const desiredBottom = secondRect.bottom;
+    const desiredHeight = Math.max(0, desiredBottom - desiredTop);
+
+    // Current right card position
+    const currentRect = rightCard.getBoundingClientRect();
+    const deltaTop = Math.round(desiredTop - currentRect.top);
+
+    // Apply visual adjustment: use margin-top to nudge the card and set explicit height
+    // Use box-sizing to ensure padding/borders don't break the measured height.
+    rightCard.style.boxSizing = 'border-box';
+    // Keep a small safety minimum
+    const minH = 80;
+    rightCard.style.marginTop = `${deltaTop}px`;
+    rightCard.style.minHeight = `${Math.max(minH, desiredHeight)}px`;
+    rightCard.style.height = `${Math.max(minH, desiredHeight)}px`;
+  } catch (e) {
+    // silently ignore
+  }
+}
+
 function setupBarTooltips(){
   const tooltip = ensureBarTooltip();
   const offset = 12;
@@ -512,26 +589,6 @@ function setupBarTooltips(){
   });
 }
 
-function renderHeatmap(data) {
-  if (!heatmap) return;
-  heatmap.innerHTML = "";
-  if (!data || !data.summary) { heatmap.innerHTML = "<p>No heatmap data available</p>"; return; }
-  const summary = data.summary;
-  const fakeFrames = summary.fake_frames || 0;
-  const totalFrames = summary.total_frames_analyzed || 1;
-  const stats = [
-    { label: "Real frames", value: summary.total_frames_analyzed - fakeFrames, color: "#00e87b" },
-    { label: "Fake frames", value: fakeFrames, color: "#ff2d78" },
-    { label: "Frame coverage", value: `${(totalFrames / 30).toFixed(1)}s approx`, color: "#00a8e8" },
-  ];
-  stats.forEach((stat) => {
-    const cell = document.createElement("div");
-    cell.className = "heatmap-cell";
-    cell.style.borderLeft = `4px solid ${stat.color}`;
-    cell.innerHTML = `<span style="color: ${stat.color}; font-weight: 600;">${stat.label}</span>: ${stat.value}`;
-    heatmap.appendChild(cell);
-  });
-}
 
 function showResults(data) {
   if (loadingSection) loadingSection.classList.add("hidden");
@@ -552,9 +609,9 @@ function showResults(data) {
     if (gaugeScore) gaugeScore.textContent = "--%";
     if (gaugeLabel) gaugeLabel.textContent = "Pending";
     if (gaugeFill) gaugeFill.style.transform = "rotate(-90deg)";
-    renderFactors(null); renderTimeline(null); renderHeatmap(null);
+    renderFactors(null); renderTimeline(null); renderFrameSummary(null);
   } else {
-    setGauge(score); renderFactors(data); renderTimeline(data); renderHeatmap(data);
+    setGauge(score); renderFactors(data); renderTimeline(data); renderFrameSummary(data);
   }
 }
 

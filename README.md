@@ -199,7 +199,7 @@ deactivate
      - 30-60% (Orange): Possibly Manipulated  
      - 60-100% (Pink): Likely Fake
    - **Contributing Factors**: Detailed breakdown of detected artifacts
-   - **Frame Heatmap**: Statistics on real vs fake frames
+   - **Frame Summary**: Statistics on real vs fake frames
 
 ---
 
@@ -492,7 +492,7 @@ The extension uses a sophisticated multi-stage forensic pipeline:
    - Generates factor descriptions & severity levels
 
 7. **Visualization** (results.js)
-   - Displays gauge, factor breakdown, timeline chart, heatmap
+   - Displays gauge, factor breakdown, timeline chart, frame summary
    - Interactive expandable factor details with explanations
 
 **Key Innovations**:
