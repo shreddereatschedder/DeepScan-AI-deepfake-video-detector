@@ -326,7 +326,7 @@ def analyze_video_background(video_path):
             print(f"[ERROR] Missing analysis dependencies: {e}")
             return
 
-        result = analyze_video(
+        result = analyze_video(                                                                            
             video_path=video_path,
             model_path=MODEL_PATH,
             frame_interval=5,

@@ -92,7 +92,7 @@ def process_video(video_path):
 # -----------------------
 if __name__ == "__main__":
     print("="*60)
-    print("Deepfake Video Analyzer - Folder Monitor")
+    print("Deepfake Video Analyser - Folder Monitor")
     print("="*60)
     print(f"Monitoring folder: {DOWNLOADS_FOLDER}")
     print(f"Using model: {MODEL_PATH}")

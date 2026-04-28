@@ -31,7 +31,7 @@ def create_temp_folder():
     return temp_dir
 
 
-def extract_frames(video_path, temp_folder, frame_interval=5, max_frames=None):
+def extract_frames(video_path, temp_folder, frame_interval=1, max_frames=None):
     """
     Extract frames from a video file.
     
@@ -150,7 +150,7 @@ def predict_frame(frame_path, model):
     }
 
 
-def analyze_video(video_path, model_path, frame_interval=1, keep_temp=False):
+def analyze_video(video_path, model_path, frame_interval=5, keep_temp=False):
     """
     Complete video analysis pipeline.
     

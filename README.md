@@ -134,7 +134,7 @@ Everything is configured and ready. Head to the [Usage Guide](#usage-guide) belo
 
 ## Usage Guide
 
-### Analyzing a YouTube Video
+### Analysing a YouTube Video
 
 1. **Open a YouTube video** in Chrome
 2. **Right-click on the video** → Select "Check video for deepfake" (context menu)
@@ -366,6 +366,8 @@ credibility_checker/
 │   ├── model_training/            # Training scripts and artifacts
 │   │   ├── models/
 │   │   │   └── deepfake_detector.h5
+│   │   ├── model_generation_images.py # model generator using static image dataset
+│   │   ├── model_generation.py        # model generator/refiner using video dataset 
 │   │   └── training_metrics.json
 │   │
 │   └── analysis_results/          # Per-video analysis output
@@ -377,9 +379,6 @@ credibility_checker/
 ├── dataset/                         # Training data (not included here due to size of dataset)
 │   ├── image_dataset/             # Static image data (spatial artifacts)
 │   └── video_dataset/             # Video data (temporal artifacts)
-│
-├── My_Dev_Diary/                    # Development journal entries
-│   └── #1 through #... (tracking)
 │
 ├── requirements.txt                 # Python dependencies
 ├── setup.py                         # Script to set up dependencies
