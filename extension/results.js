@@ -164,12 +164,13 @@ function renderFrameSummary(data) {
   //frameSummary.innerHTML = "";
   //if (!data || !data.summary) { frameSummary.innerHTML = "<p>No frame summary data available</p>"; return; }
   const summary = data.summary || {};
+  const fps = summary.fps || 30;
   const fakeFrames = summary.fake_frames || 0;
   const totalFrames = summary.total_frames_analyzed || 1;
   const stats = [
     { label: "Real frames", value: (summary.total_frames_analyzed || 0) - fakeFrames, color: "#00e87b" },
     { label: "Fake frames", value: fakeFrames, color: "#ff2d78" },
-    { label: "Frame coverage", value: `${(totalFrames / 30).toFixed(1)}s approx`, color: "#00a8e8" },
+    { label: "Frame coverage", value: `${(totalFrames / fps).toFixed(1)}s approx`, color: "#00a8e8" },
   ];
   stats.forEach((stat) => {
     const cell = document.createElement("div");

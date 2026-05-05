@@ -44,7 +44,9 @@ def extract_frames(video_path, temp_folder, frame_interval=1, max_frames=None):
     Returns:
         list: List of extracted frame file paths
     """
+    extraction_start = datetime.now()
     print(f"[INFO] Extracting frames from: {os.path.basename(video_path)}")
+    print(f"   Start time: {extraction_start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
     
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -82,8 +84,12 @@ def extract_frames(video_path, temp_folder, frame_interval=1, max_frames=None):
         frame_count += 1
     
     cap.release()
+    extraction_end = datetime.now()
+    extraction_duration = (extraction_end - extraction_start).total_seconds()
     print(f"   [SUCCESS] Extracted {extracted_count} frames")
-    return frame_paths
+    print(f"   End time: {extraction_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+    print(f"   Duration: {extraction_duration:.2f} seconds")
+    return frame_paths, fps
 
 
 def load_deepfake_model(model_path):
@@ -168,13 +174,15 @@ def analyze_video(video_path, model_path, frame_interval=5, keep_temp=False):
             - frame_results: list of per-frame results
     """
     
+    analysis_start = datetime.now()
     temp_folder = create_temp_folder()
     print(f"\n[INFO] Starting analysis for: {os.path.basename(video_path)}")
+    print(f"   Analysis start time: {analysis_start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
     print(f"   Temp folder: {temp_folder}")
     
     try:
         # Step 1: Extract frames
-        frame_paths = extract_frames(video_path, temp_folder, frame_interval=frame_interval)
+        frame_paths, fps = extract_frames(video_path, temp_folder, frame_interval=frame_interval)
         
         if not frame_paths:
             raise ValueError("No frames were extracted from the video")
@@ -205,7 +213,7 @@ def analyze_video(video_path, model_path, frame_interval=5, keep_temp=False):
                 "frame_path": frame_path,
                 "confidence": result["confidence"],
                 "label": result["label"],
-                "timestamp_sec": (frame_num / 30)  # Assume 30 FPS as default
+                "timestamp_sec": (frame_num / fps)
             })
             confidences.append(result["confidence"])
             
@@ -229,7 +237,7 @@ def analyze_video(video_path, model_path, frame_interval=5, keep_temp=False):
                 forensic_metrics.get("flicker_score", 0.0),
                 forensic_metrics.get("alignment_score", 0.0),
             ]))
-        # Legacy combined score removed: overall label based on fake percentage
+
         combined_risk_score = None
         overall_label = "fake" if fake_percentage > 50 else "real"
         
@@ -242,6 +250,7 @@ def analyze_video(video_path, model_path, frame_interval=5, keep_temp=False):
             "overall_label": overall_label,
             "analysis_timestamp": datetime.now().isoformat(),
             "frame_interval": frame_interval,
+            "fps": fps,
             "label_mapping": {
                 "fake": 1,
                 "real": 0,
@@ -271,11 +280,14 @@ def analyze_video(video_path, model_path, frame_interval=5, keep_temp=False):
         summary_df.to_csv(summary_csv_path, index=False)
         print(f"[INFO] Summary results saved to: {summary_csv_path}")
         
+        analysis_end = datetime.now()
+        total_duration = (analysis_end - analysis_start).total_seconds()
         print(f"\n[SUCCESS] Analysis complete!")
+        print(f"   Analysis end time: {analysis_end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+        print(f"   Total duration: {total_duration:.2f} seconds ({total_duration/60:.2f} minutes)")
         print(f"   Overall verdict: {summary['overall_label'].upper()}")
         print(f"   Fake percentage: {summary['fake_percentage']:.1f}%")
         # Avg/max/min confidence removed from summary; show fake percentage instead
-        print(f"   Fake percentage: {summary['fake_percentage']:.1f}%")
         
         return {
             "results_csv": results_csv_path,
