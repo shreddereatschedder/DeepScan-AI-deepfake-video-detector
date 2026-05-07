@@ -35,11 +35,34 @@ import uuid
 
 app = FastAPI()
 
-# Startup event - initialize in background
+# Helper function for cleanup
+def _clear_dir(path: str):
+    """Remove all files and directories in the given path."""
+    if not os.path.exists(path):
+        return
+    for name in os.listdir(path):
+        full = os.path.join(path, name)
+        try:
+            if os.path.islink(full) or os.path.isfile(full):
+                os.remove(full)
+            elif os.path.isdir(full):
+                shutil.rmtree(full)
+        except Exception as e:
+            print(f"[WARN] Failed to remove {full}: {e}")
+
+# Startup event - clean up temporary files
 @app.on_event("startup")
 async def startup_event():
-    # Sanity check runs in background thread and displays banner when ready
-    pass
+    """Clean up downloads and analysis_results folders when server starts."""
+    _clear_dir(DOWNLOAD_DIR)
+    _clear_dir(RESULTS_FOLDER)
+
+# Shutdown event - clean up temporary files
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up downloads and analysis_results folders when server shuts down."""
+    _clear_dir(DOWNLOAD_DIR)
+    _clear_dir(RESULTS_FOLDER)
 
 # CORS for cloud deployment
 app.add_middleware(
@@ -463,35 +486,7 @@ async def upload_cookies(file: UploadFile | None = File(None), cookies_text: str
 
 @app.post("/analyze_url")
 async def analyze_url(request: VideoRequest, http_request: Request):
-    """Download and analyze a YouTube video.
-
-    This endpoint logs incoming payloads and headers to backend/logs/analyze_requests.log
-    to aid debugging of download/analysis failures.
-    """
-    # Server-side logging for incoming requests
-    try:
-        logger = logging.getLogger("analyze_url")
-        if not getattr(logger, "_configured", False):
-            logs_dir = os.path.join(PROJECT_ROOT, "backend", "logs")
-            os.makedirs(logs_dir, exist_ok=True)
-            fh = logging.FileHandler(os.path.join(logs_dir, "analyze_requests.log"), encoding="utf-8")
-            fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-            logger.addHandler(fh)
-            logger.setLevel(logging.INFO)
-            logger._configured = True
-        headers = dict(http_request.headers) if http_request is not None else {}
-        client = None
-        try:
-            client = http_request.client.host if getattr(http_request, "client", None) else None
-        except Exception:
-            client = None
-        logger.info("Incoming /analyze_url request: url=%s cookies_text_present=%s client=%s headers=%s",
-                    getattr(request, "url", None),
-                    getattr(request, "cookies_text", None) is not None,
-                    client,
-                    headers)
-    except Exception as e:
-        print(f"[WARN] Failed to write analyze_url log: {e}")
+    """Download and analyze a YouTube video."""
     # If cookies content was provided in the request, write it to a temporary cookies file
     cookies_path = None
     try:
